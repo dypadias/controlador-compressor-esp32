@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel de Controle - EletroMatos</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: linear-gradient(180deg,#021224,#063046); color: #fff; padding: 18px; margin: 0; }
+    .wrap { max-width: 980px; margin: 0 auto; }
+    .card { background: rgba(255,255,255,0.04); padding: 16px; border-radius: 12px; margin: 12px 0; border: 1px solid rgba(255,255,255,0.06); }
+    .header { display: flex; align-items: center; justify-content: space-between; }
+    .logo-text { font-size: 26px; font-weight: 700; color: #5dade2; }
+    .logo-subtitle { font-size: 14px; color: #ecf0f1; font-weight: 300; margin-top: -5px; }
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 12px; }
+    .item { background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; text-align: center; }
+    .item .big { font-size: 1.4em; font-weight: 700; margin-top: 5px; }
+    .btn-reset { background:none; border:1px solid #ff8c00; color:#ff8c00; border-radius:50%; width:28px; height:28px; cursor:pointer; font-size:16px; }
+    button { padding:10px 14px; border-radius:8px; border:0; cursor:pointer; font-weight:600; }
+    .btn-green { background:#1db954; color:#fff; }
+    .btn-red { background:#e02424; color:#fff; }
+    .btn-blue { background:#0b84ff; color:#fff; }
+    .btn-orange { background:#ff8c00; color:#fff; }
+    .config-form input { width:80px; padding:8px; border-radius:6px; border:1px solid rgba(255,255,255,0.08); background:transparent; color:#fff; }
+    #alerts { display:none; background:#c53030; text-align:center; }
+    .footer { text-align:center; font-size:0.9em; color:#a0c8e0; padding-top:10px; }
+    a { color:#5dade2; text-decoration:none; }
+    .history-list { list-style:none; padding:0; text-align:center; }
+    .history-list li { background: rgba(0,0,0,0.2); margin-bottom: 5px; padding: 5px; border-radius: 4px; }
+    @media (max-width:800px){ .grid { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card header">
+      <div>
+        <div class="logo-text">🤖 EletroMatos</div>
+        <div class="logo-subtitle">Automação Residencial</div>
+      </div>
+      <div><small>Usuário: admin</small></div>
+    </div>
+    <div class="card">
+      <div class="grid">
+        <div class="item"><div>Estado</div><div id="estado" class="big">--</div></div>
+        <div class="item"><div>Temperatura</div><div id="temp" class="big">-- °C</div></div>
+        <div class="item"><div>Caixa</div><div id="caixa" class="big">--</div></div>
+        <div class="item">
+          <div class="label">
+            <span>Enchimentos</span>
+            <button class="btn-reset" onclick="zerarCiclos()" title="Zerar Contadores">🔄</button>
+          </div>
+          <div id="ciclos-enchimento" class="big">--</div>
+        </div>
+        <div class="item"><div>Ciclos Liga/Desliga</div><div id="ciclos-parciais" class="big">--</div></div>
+        <div class="item"><div>Último Enchimento</div><div id="tempo-enchimento" class="big">--:--</div></div>
+        <div class="item" style="grid-column: span 2; background:#0b84ff;">
+          <div>Próximo Ciclo</div>
+          <div id="tempo-restante" class="big">--:--</div>
+          <small id="proximo-estado">Aguardando...</small>
+        </div>
+      </div>
+      <div style="text-align:center; margin-top:20px;">
+        <button class="btn-green" onclick="comando('/ligar')">🟢 Ligar</button>
+        <button class="btn-red" onclick="comando('/desligar')">🔴 Desligar</button>
+        <button class="btn-blue" onclick="comando('/automatico')">🤖 Automático</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>💧 Histórico e Média de Enchimento</h2>
+      <div style="display:grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+        <div>
+          <h4>Últimos 5 tempos</h4>
+          <ul id="history-list" class="history-list"><li>--</li></ul>
+        </div>
+        <div style="text-align:center; background:rgba(0,0,0,0.2); padding:10px; border-radius:8px;">
+          <h4>Média de Tempo</h4>
+          <div id="media-enchimento" style="font-size: 1.8em; font-weight: bold;">--:--</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>📈 Histórico de Temperatura (24h)</h2>
+      <canvas id="tempChart"></canvas>
+    </div>
+    <div class="card config-form">
+      <h3>Configurações de Operação</h3>
+      <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+        <div><label>Tempo Ligado (min)</label><br><input id="tOn" type="number" min="1"></div>
+        <div><label>Tempo Descanso (min)</label><br><input id="tOff" type="number" min="1"></div>
+        <div><label>Temp. Máxima (°C)</label><br><input id="tMax" type="number" min="0" max="120"></div>
+        <div style="align-self:end"><button onclick="salvarConfig()" class="btn-orange">💾 Salvar</button></div>
+      </div>
+    </div>
+    <div id="alerts" class="card"></div>
+    <div class="card footer">
+      <p>Desenvolvido por: <strong>EletroMatos</strong> | Suporte Técnico: <strong>(51) 98240-6919</strong></p>
+      <p><a href="/configwifi">Configurar Conexão WiFi</a></p>
+    </div>
+  </div>
+  <script>
+    let tempChart;
+    function comando(url) { fetch(url).then(r => r.text()).then(t => { if (t.includes('❌')) alert(t); updateStatus(); }).catch(e => console.error('Erro comando:', e)); }
+    function zerarCiclos() { if (confirm('Tem certeza que deseja zerar todos os contadores e o histórico?')) { comando('/zerarciclos'); } }
+    function formatarTempo(s) { if (s <= 0 || s === null || typeof s === 'undefined') return '--:--'; const m = Math.floor(s / 60); const seg = s % 60; return `${m.toString().padStart(2,'0')}:${seg.toString().padStart(2,'0')}`; }
+    function salvarConfig() { const f = new FormData(); f.append('tempoligado', document.getElementById('tOn').value); f.append('tempodescanso', document.getElementById('tOff').value); f.append('temperaturamax', document.getElementById('tMax').value); fetch('/config', { method: 'POST', body: f }).then(r => r.text()).then(t => { alert(t); updateStatus(); }).catch(e => alert('Erro ao salvar: ' + e)); }
+    function updateStatus() {
+      fetch('/status').then(r => r.json()).then(data => {
+        const modo = data.modoManual ? 'MANUAL' : 'AUTOMÁTICO';
+        document.getElementById('estado').innerHTML = `${data.compressorLigado ? 'LIGADO' : 'DESLIGADO'}<br><small>${modo}</small>`;
+        document.getElementById('temp').innerText = data.temperatura.toFixed(1) + ' °C';
+        document.getElementById('caixa').innerText = data.caixaCheia ? 'CHEIA' : 'VAZIA';
+        document.getElementById('ciclos-enchimento').innerText = data.ciclosEnchimentoCompletos;
+        document.getElementById('ciclos-parciais').innerText = data.ciclosParciaisOperacao;
+        document.getElementById('tempo-enchimento').innerText = data.historicoEnchimento.length > 0 && data.historicoEnchimento[0].tempo > 0 ? formatarTempo(data.historicoEnchimento[0].tempo) : '--:--';
+        if (data.modoManual) {
+          document.getElementById('tempo-restante').innerText = 'N/A';
+          document.getElementById('proximo-estado').innerText = 'Modo Manual';
+        } else {
+          document.getElementById('tempo-restante').innerText = formatarTempo(data.tempoRestante);
+          document.getElementById('proximo-estado').innerText = `Para ${data.proximoEstado}`;
+        }
+        if (!document.activeElement.matches('input')) {
+          document.getElementById('tOn').value = data.tempoLigado;
+          document.getElementById('tOff').value = data.tempoDescanso;
+          document.getElementById('tMax').value = data.temperaturaMaxima.toFixed(1);
+        }
+        const historyList = document.getElementById('history-list');
+        historyList.innerHTML = '';
+        if (data.historicoEnchimento.length > 0 && data.historicoEnchimento[0].tempo > 0) {
+          data.historicoEnchimento.forEach(item => {
+            if (item.tempo > 0) { historyList.innerHTML += `<li>${formatarTempo(item.tempo)} (${item.ciclos} ciclos)</li>`; }
+          });
+        } else { historyList.innerHTML = '<li>Nenhum registro</li>'; }
+        document.getElementById('media-enchimento').innerText = formatarTempo(data.mediaEnchimento);
+        const a = document.getElementById('alerts');
+        let msg = '';
+        if (data.alertaTemperatura) msg += '<p>🌡️ ALERTA: Temperatura alta!</p>';
+        if (data.alertaCaixaCheia) msg += '<p>💧 ALERTA: Caixa cheia!</p>';
+        if (msg) { a.style.display = 'block'; a.innerHTML = msg; } else { a.style.display = 'none'; }
+      }).catch(e => console.error('Erro updateStatus:', e));
+    }
+    function inicializarGrafico() {
+      const ctx = document.getElementById('tempChart').getContext('2d');
+      fetch('/tempdata').then(r => r.json()).then(data => {
+        tempChart = new Chart(ctx, { type: 'line', data: { labels: data.labels, datasets: [{ label: 'Temperatura °C', data: data.dados, backgroundColor: 'rgba(52,152,219,0.2)', borderColor: 'rgba(52,152,219,1)', borderWidth: 2, pointBackgroundColor: '#fff', tension: 0.3 }] }, options: { scales: { y: { ticks: { color: '#fff' } }, x: { ticks: { color: '#fff' } } }, plugins: { legend: { labels: { color: '#fff' } } } } });
+      }).catch(e => console.error('Erro gráfico:', e));
+    }
+    setInterval(updateStatus, 2500);
+    window.onload = () => { updateStatus(); inicializarGrafico(); };
+  </script>
+</body>
+</html>
