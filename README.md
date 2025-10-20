@@ -30,7 +30,7 @@ Este projeto foi desenvolvido utilizando **Visual Studio Code** com a extensão 
 
 1.  **Clone o repositório:**
     ```bash
-    git clone [https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git](https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git)
+    git clone https://github.com/dypadias/controlador-compressor-esp32
     ```
 2.  **Abra o projeto no VS Code:**
     * Vá em `File > Open Folder` e selecione a pasta do projeto.
